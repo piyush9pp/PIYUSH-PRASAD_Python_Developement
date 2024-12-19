@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notification System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        h2 {
+            margin: 10px 0;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        ul {
+            list-style-type: none;
+        }
+
+        li {
+            background-color: #f9f9f9;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .logout-button {
+            margin-top: 10px;
+            background-color: #f44336;
+        }
+
+        .logout-button:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Notification System</h1>
+
+        <div id="register-section">
+            <h2>Register</h2>
+            <input type="text" id="register-username" placeholder="Username" autocomplete="off">
+            <input type="password" id="register-password" placeholder="Password" autocomplete="off">
+            <button onclick="registerUser()">Register</button>
+            <p><a href="#" onclick="showLogin()">Already have an account? Login</a></p>
+        </div>
+
+        <div id="login-section" class="hidden">
+            <h2>Login</h2>
+            <input type="text" id="login-username" placeholder="Username" autocomplete="off">
+            <input type="password" id="login-password" placeholder="Password" autocomplete="off">
+            <button onclick="loginUser()">Login</button>
+            <p><a href="#" onclick="showRegister()">Don't have an account? Register</a></p>
+        </div>
+
+        <div id="notification-section" class="hidden">
+            <h2>Send Notification</h2>
+            <input type="text" id="notification-title" placeholder="Title" autocomplete="off">
+            <input type="text" id="notification-message" placeholder="Message" autocomplete="off">
+            <input type="text" id="notification-user-ids" placeholder="User IDs (comma separated)" autocomplete="off">
+            <select id="notification-type">
+                <option value="Push">Push</option>
+                <option value="In-App">In-App</option>
+            </select>
+            <button onclick="sendNotification()">Send Notification</button>
+
+            <h2>Notifications</h2>
+            <ul id="notifications-list"></ul>
+
+            <button class="logout-button" onclick="logoutUser()">Logout</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let currentToken = '';
+
+        function showRegister() {
+            document.getElementById('register-section').classList.remove('hidden');
+            document.getElementById('login-section').classList.add('hidden');
+        }
+
+        function showLogin() {
+            document.getElementById('login-section').classList.remove('hidden');
+            document.getElementById('register-section').classList.add('hidden');
+        }
+
+        async function registerUser() {
+            const username = document.getElementById('register-username').value;
+            const password = document.getElementById('register-password').value;
+
+            const response = await fetch(`${API_URL}/register/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+            });
+
+            const data = await response.json();
+            alert(data.message || 'Registration failed.');
+        }
+
+        async function loginUser() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            const response = await fetch(`${API_URL}/login/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password }),
+            });
+
+            const data = await response.json();
+            if (data.access_token) {
+                currentToken = data.access_token;
+                document.getElementById('login-section').classList.add('hidden');
+                document.getElementById('notification-section').classList.remove('hidden');
+                alert('Logged in successfully!');
+                fetchNotifications();
+            } else {
+                alert(data.detail || 'Invalid login!');
+            }
+        }
+
+        async function sendNotification() {
+            const title = document.getElementById('notification-title').value;
+            const message = document.getElementById('notification-message').value;
+            const userIds = document.getElementById('notification-user-ids').value.split(',').map(id => parseInt(id.trim()));
+            const notificationType = document.getElementById('notification-type').value;
+
+            const response = await fetch(`${API_URL}/send_notification/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentToken}`,
+                },
+                body: JSON.stringify({ title, message, user_ids: userIds, notification_type: notificationType }),
+            });
+
+            const data = await response.json();
+            alert("notification sent successfully");
+            fetchNotifications();
+        }
+
+        async function fetchNotifications() {
+            const response = await fetch(`${API_URL}/notifications/`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${currentToken}` },
+            });
+
+            const notifications = await response.json();
+            const notificationsList = document.getElementById('notifications-list');
+            notificationsList.innerHTML = '';
+
+            notifications.forEach(notification => {
+                const li = document.createElement('li');
+                li.textContent = `${notification.title}: ${notification.message} (Type: ${notification.notification_type})`;
+                notificationsList.appendChild(li);
+            });
+        }
+
+        function logoutUser() {
+            currentToken = '';
+            localStorage.removeItem('access_token');
+            document.getElementById('notification-section').classList.add('hidden');
+            document.getElementById('login-section').classList.remove('hidden');
+            alert('Logged out successfully!');
+        }
+    </script>
+</body>
+</html>
